@@ -1,0 +1,225 @@
+---
+title: "Final Project"
+author: "Amadeo Grob"
+date: "4 5 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list=ls());                                                                      
+graphics.off();                                                                     
+options("width"=80);
+
+library(readxl)
+library(tidyverse)
+library(haven)
+library(Synth)
+library(devtools)
+library(readr)
+library(ggplot2)
+library(viridis)
+library(hrbrthemes)
+library(DT)
+library(extrafont)
+loadfonts(device = "win")
+font_import()
+fonttable()
+windowsFonts(Times=windowsFont("TT Times New Roman"))
+```
+
+```{r}
+#Load the datasets into R
+
+COVID19Cases_geoRegion <- read_csv("COVID19Cases_geoRegion.csv", 
+    col_types = cols(datum = col_character(), 
+        entries = col_number(), entries_diff_last = col_number(), 
+        entries_diff_last_age = col_number(), 
+        entries_letzter_stand = col_number(), 
+        entries_neu_gemeldet = col_number(), 
+        inz_entries = col_number(), inzdelta7d = col_number(), 
+        inzmean14d = col_number(), inzmean7d = col_number(), 
+        inzsum14d = col_number(), inzsum7d = col_number(), 
+        inzsumTotal = col_number(), inzsumTotal_Phase2 = col_number(), 
+        inzsumTotal_Phase2b = col_number(), 
+        inzsumTotal_Phase3 = col_number(), 
+        inzsumTotal_last14d = col_number(), 
+        inzsumTotal_last28d = col_number(), 
+        inzsumTotal_last7d = col_number(), 
+        mean14d = col_number(), mean7d = col_number(), 
+        offset_Phase2 = col_skip(), offset_Phase2b = col_skip(), 
+        offset_Phase3 = col_skip(), offset_last14d = col_skip(), 
+        offset_last28d = col_skip(), offset_last7d = col_skip(), 
+        pop = col_number(), sum14d = col_number(), 
+        sum7d = col_number(), sumTotal = col_number(), 
+        sumTotal_Phase2 = col_number(), sumTotal_Phase2b = col_number(), 
+        sumTotal_Phase3 = col_number(), sumTotal_last14d = col_number(), 
+        sumTotal_last28d = col_number(), 
+        sumTotal_last7d = col_number(), sumdelta7d = col_number(), 
+        timeframe_14d = col_skip(), timeframe_28d = col_skip(), 
+        timeframe_7d = col_skip(), timeframe_phase2 = col_skip(), 
+        timeframe_phase2b = col_skip(), timeframe_phase3 = col_skip(), 
+        type_variant = col_character()))
+
+#View(COVID19Cases_geoRegion)
+#summary(COVID19Cases_geoRegion)
+
+COVID19Test_geoRegion_all <- read_csv("COVID19Test_geoRegion_all.csv", 
+    col_types = cols(anteil_pos_14 = col_number(), 
+        anteil_pos_28 = col_number(), anteil_pos_all = col_number(), 
+        anteil_pos_phase2 = col_number(), 
+        anteil_pos_phase2b = col_number(), 
+        anteil_pos_phase3 = col_number(), 
+        datum = col_character(), entries = col_number(), 
+        entries_diff_last = col_skip(), entries_diff_last_age = col_number(), 
+        entries_neg = col_number(), entries_pos = col_number(), 
+        inz_entries = col_number(), inzmean14d = col_number(), 
+        inzmean7d = col_number(), inzsum14d = col_number(), 
+        inzsum7d = col_number(), inzsumTotal = col_number(), 
+        inzsumTotal_Phase2 = col_number(), 
+        inzsumTotal_Phase2b = col_number(), 
+        inzsumTotal_Phase3 = col_number(), 
+        inzsumTotal_last14d = col_number(), 
+        inzsumTotal_last28d = col_number(), 
+        inzsumTotal_last7d = col_number(), 
+        mean14d = col_number(), mean7d = col_number(), 
+        pop = col_number(), pos_anteil = col_number(), 
+        pos_anteil_mean7d = col_number(), 
+        sum14d = col_number(), sum7d = col_number(), 
+        sumTotal = col_number(), sumTotal_Phase2 = col_number(), 
+        sumTotal_Phase2b = col_number(), 
+        sumTotal_Phase3 = col_number(), sumTotal_last14d = col_number(), 
+        sumTotal_last28d = col_number(), 
+        sumTotal_last7d = col_number(), timeframe_14d = col_skip(), 
+        timeframe_28d = col_skip(), timeframe_7d = col_skip(), 
+        timeframe_phase2 = col_skip(), timeframe_phase2b = col_skip(), 
+        timeframe_phase3 = col_skip()))
+
+#View(COVID19Test_geoRegion_all)
+#summary(COVID19Test_geoRegion_all)
+```
+
+```{r}
+#Delete the rows for Switzerland and the Principality of Liechtenstein
+
+COVID19Cases_geoRegion <- COVID19Cases_geoRegion[!(COVID19Cases_geoRegion$geoRegion=="CH" | COVID19Cases_geoRegion$geoRegion=="FL" | COVID19Cases_geoRegion$geoRegion=="CHFL" ),]
+
+COVID19Test_geoRegion_all <- COVID19Test_geoRegion_all[!(COVID19Test_geoRegion_all$geoRegion=="CH" | COVID19Test_geoRegion_all$geoRegion=="CHFL" | COVID19Test_geoRegion_all$geoRegion=="FL" ),]
+
+#Add a column with the region as a numeric so that the function dataprep can use it
+
+COVID19Cases_geoRegion <- cbind(COVID19Cases_geoRegion, as.numeric(as.factor(COVID19Cases_geoRegion$geoRegion)))
+colnames(COVID19Cases_geoRegion)[39] <- "num_geoRegion"
+
+COVID19Test_geoRegion_all <- cbind(COVID19Test_geoRegion_all, as.numeric(as.factor(COVID19Test_geoRegion_all$geoRegion)))
+colnames(COVID19Test_geoRegion_all)[44] <- "num_geoRegion"
+
+#transforms the column "datum" from character format into some time format, but dataprep can only use numeric formats -> maybe solve with a loop? 26 cantons, 435 days
+
+COVID19Cases_geoRegion$datum <- as.POSIXct(COVID19Cases_geoRegion$datum, origin = "2020-02-23", tz = "CET", format = "%Y-%m-%d")
+
+COVID19Test_geoRegion_all$datum <- as.POSIXct(COVID19Test_geoRegion_all$datum, origin = "2020-01-24", tz = "CET", format = "%Y-%m-%d") #test dataset has 26 cantons but starts a month earlier -> 465 days measured, but many NAs in the first months
+
+COVID19Cases_geoRegion <- cbind(COVID19Cases_geoRegion, rep(c(31:465), times = 26))
+COVID19Test_geoRegion_all <- cbind(COVID19Test_geoRegion_all, rep(c(1:465), times = 26))
+
+COVID19Test_geoRegion_all <- COVID19Test_geoRegion_all[which(COVID19Test_geoRegion_all$`rep(c(1:465), times = 26)`>30),]
+colnames(COVID19Cases_geoRegion)[3]<-"cases"
+colnames(COVID19Test_geoRegion_all)[2]<-"tests"
+
+colnames(COVID19Cases_geoRegion)[40] <- "num_datum"
+colnames(COVID19Test_geoRegion_all)[45] <- "num_datum"
+
+synth_data <- cbind(COVID19Cases_geoRegion,COVID19Test_geoRegion_all)
+
+View(COVID19Cases_geoRegion)
+View(COVID19Test_geoRegion_all)
+```
+
+
+```{r}
+#Exploratory data analysis and plots
+
+plot(COVID19Cases_geoRegion$num_datum, COVID19Cases_geoRegion$entries, type = "l", ylim = cbind(0, max(COVID19Cases_geoRegion$entries)), xlab = "Time", ylab = "Daily confirmed Cases")
+
+plot(COVID19Test_geoRegion_all$num_datum, COVID19Test_geoRegion_all$entries, type = "l", ylim = cbind(0, 12000), xlab = "Time", ylab = "Daily conducted Tests")
+
+plot(COVID19Test_geoRegion_all$num_datum, COVID19Test_geoRegion_all$pos_anteil, type = "l", ylim = cbind(-5, 100), xlab = "Time", ylab = "Share of positive results")
+
+data <- COVID19Cases_geoRegion %>% 
+  filter(COVID19Cases_geoRegion$geoRegion %in% c("BL", "BS", "SO", "LU", "ZG", "SH"))
+
+data$geoRegion <- as.factor(data$geoRegion)
+
+# Spaghetti Plot
+data %>%
+  ggplot( aes(x=datum, y=entries, group=geoRegion, color=geoRegion)) +
+    geom_line() +
+    scale_color_viridis(discrete = TRUE) +
+    theme_bw() +
+    theme(
+      legend.position="right",
+      plot.title = element_text(size=14)
+    ) +
+    ggtitle("Case Numbers in selected Cantons") +
+    theme_ipsum()
+
+data2 <- COVID19Test_geoRegion_all %>% 
+  filter(COVID19Test_geoRegion_all$geoRegion %in% c("BL", "BS", "SO", "LU", "ZG", "SH"))
+
+data2$geoRegion <- as.factor(data2$geoRegion)
+
+# Spaghetti Plot
+data2 %>%
+  ggplot( aes(x=datum, y=entries, group=geoRegion, color=geoRegion)) +
+    geom_line() +
+    scale_color_viridis(discrete = TRUE) +
+    theme_bw() +
+    theme(
+      legend.position="right",
+      plot.title = element_text(size=14)
+    ) +
+    ggtitle("Conducted Tests in selected Cantons per day") +
+    theme_ipsum()
+
+data2 %>%
+  ggplot( aes(x=datum, y=pos_anteil, group=geoRegion, color=geoRegion)) +
+    geom_line() +
+    scale_color_viridis(discrete = TRUE) +
+    theme_bw() +
+    theme(
+      legend.position="right",
+      plot.title = element_text(size=14)
+    ) +
+    ggtitle("Share of positive Tests in selected Cantons in %") +
+    theme_ipsum()
+
+```
+
+
+```{r}
+#implement dataprep function to set up the synthetic control
+
+covid_data <- dataprep(
+  foo = synth_data,
+  predictors=c("pop","tests"),
+  time.predictors.prior = 31:381, #fit pre treatment trend
+  dependent = c("cases"), #outcome variable
+  unit.names.variable = c("geoRegion"), #cantons
+  unit.variable = c("num_geoRegion"), #cantons but as numeric
+  time.variable = c("num_datum"), #date or day in our case
+  treatment.identifier = 5, #wich unit is treated? Here canton Baselland
+  controls.identifier = c(1:4,6:26), #donor pool
+  time.optimize.ssr = 31:381, #whole timeframe of the estimation
+  time.plot = 31:465 #timeframe for plots
+)
+
+#apply synthetic control
+
+synth_out <- synth(data.prep.obj = covid_data)
+
+path.plot(synth_out, dataprep_out)
+
+```
+
