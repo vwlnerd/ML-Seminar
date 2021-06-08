@@ -17,6 +17,7 @@ library(tidyverse)
 library(haven)
 library(Synth)
 library(devtools)
+library(SCtools)
 library(readr)
 library(ggplot2)
 library(viridis)
@@ -133,8 +134,13 @@ colnames(COVID19Test_geoRegion_all)[45] <- "num_datum"
 
 synth_data <- cbind(COVID19Cases_geoRegion,COVID19Test_geoRegion_all)
 
-View(COVID19Cases_geoRegion)
-View(COVID19Test_geoRegion_all)
+
+COVID19Cases_geoRegion<-cbind(COVID19Cases_geoRegion,COVID19Test_geoRegion_all$tests,COVID19Test_geoRegion_all$pos_anteil,COVID19Test_geoRegion_all$pos_anteil_mean7d)
+
+colnames(COVID19Cases_geoRegion)[41]<-"tests"
+colnames(COVID19Cases_geoRegion)[42]<-"pos_anteil"
+colnames(COVID19Cases_geoRegion)[43]<-"pos_anteil_mean7d"
+
 ```
 
 
@@ -202,15 +208,15 @@ data2 %>%
 #implement dataprep function to set up the synthetic control
 
 covid_data <- dataprep(
-  foo = synth_data,
-  predictors=c("pop","tests"),
+  foo = COVID19Cases_geoRegion,
+  predictors=c("pop","tests","pos_anteil","pos_anteil_mean7d"),
   time.predictors.prior = 31:381, #fit pre treatment trend
-  dependent = c("cases"), #outcome variable
+  dependent = c("inzmean7d"), #outcome variable
   unit.names.variable = c("geoRegion"), #cantons
   unit.variable = c("num_geoRegion"), #cantons but as numeric
   time.variable = c("num_datum"), #date or day in our case
   treatment.identifier = 5, #wich unit is treated? Here canton Baselland
-  controls.identifier = c(1:4,6:26), #donor pool
+  controls.identifier = c(1:4,6,9,12,14:20,22,25,26), #donor pool without FR, GE, GR, JU, NE, TI, VS, VD
   time.optimize.ssr = 31:381, #whole timeframe of the estimation
   time.plot = 31:465 #timeframe for plots
 )
@@ -221,5 +227,13 @@ synth_out <- synth(data.prep.obj = covid_data)
 
 path.plot(synth_out, dataprep_out)
 
+```
+
+```{r}
+placebos <- generate.placebos(covid_data,synth_out,Sigf.ipop=3)
+plot_placebos(placebos)
+mspe.plot(tdf=placebos,discard.extreme = F,plot.hist = T)
+ratio <- mspe.test(placebos)
+ratio$p.val
 ```
 
