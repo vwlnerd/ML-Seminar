@@ -230,6 +230,13 @@ path.plot(synth_out, dataprep_out)
 ```
 
 ```{r}
+print(synth.tables   <- synth.tab(
+        dataprep.res = covid_data,
+        synth.res    = synth_out)
+      ) 
+```
+
+```{r}
 placebos <- generate.placebos(covid_data,synth_out,Sigf.ipop=3)
 plot_placebos(placebos)
 mspe.plot(tdf=placebos,discard.extreme = F,plot.hist = T)
